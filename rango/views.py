@@ -12,21 +12,26 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
 from datetime import datetime
 
+def get_server_side_cookie(request, cookie, default_val=None):
+    val = request.session.get(cookie)
+    if not val:
+        val = default_val
+    return val
 
+def visitor_cookie_handler(request):
+    visits = int(get_server_side_cookie(request, 'visits', '1'))
 
-def visitor_cookie_handler(request, response):
-    visits = int(request.COOKIES.get('visits', '1'))
+    last_visit_cookie = get_server_side_cookie(request,'last_visit',str(datetime.now()))
 
-    last_visit_cookie = request.COOKIES.get('last_visit', str(datetime.now()))
     last_visit_time = datetime.strptime(last_visit_cookie[:-7],'%Y-%m-%d %H:%M:%S')
 
     if (datetime.now() - last_visit_time).days > 0:
         visits = visits + 1
-        response.set_cookie('last_visit', str(datetime.now()))
+        request.session['last_visit'] = str(datetime.now())
     else:
-        response.set_cookie('last_visit', last_visit_cookie)
+        request.session['last_visit'] = last_visit_cookie
 
-    response.set_cookie('visits', visits)
+    request.session['visits'] = visits
 
 
 
@@ -43,14 +48,19 @@ def index(request):
     # We make use of the shortcut function to make our lives easier.
     # Note that the first parameter is the template we wish to use.
     
+    visitor_cookie_handler(request)
+    context_dict['visits'] = request.session['visits']
     response = render(request, 'rango/index.html', context=context_dict)
-    visitor_cookie_handler(request, response)
     return response
 
 def about(request):
     context_dict = {'boldmessage': 'This tutorial has been put together by Frank.'}
-
-    return render(request, 'rango/about.html', context=context_dict)
+    context_dict['visits'] = int(request.COOKIES.get('visits', '1'))
+    
+    visitor_cookie_handler(request)
+    context_dict['visits'] = request.session['visits']
+    response = render(request, 'rango/about.html', context=context_dict)
+    return response
 
 def show_category(request, category_name_slug):
     context_dict = {}
